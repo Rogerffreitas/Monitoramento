@@ -40,22 +40,25 @@ bool extrairCampoFloatActivePower(const String& json, const char* chave, float& 
 void atualizarActivePower() {
   String caminhoAtivo;
   if (!obterCaminhoActivePower(caminhoAtivo)) {
-    logErro("NTP_TIME", "Data ainda nao sincronizada", -1);
     return;
   }
 
   String resposta;
   int code = firebaseReq("GET", caminhoAtivo.c_str(), "", resposta);
+  yield();
+
   if (code != HTTP_CODE_OK) {
     logErro("FIREBASE_GET", resposta, code);
     return;
   }
 
   resposta.trim();
+  bool registroExiste = (resposta.length() > 0 && resposta != "null");
+
   float meteringAtual = 0.0f;
   float consumoAtual = 0.0f;
 
-  if (resposta.length() > 0 && resposta != "null") {
+  if (registroExiste) {
     if (!extrairCampoFloatActivePower(resposta, "energy_metering", meteringAtual) ||
         !extrairCampoFloatActivePower(resposta, "energy_consumption", consumoAtual)) {
       logErro("JSON_PARSE", resposta, -1);
@@ -63,15 +66,24 @@ void atualizarActivePower() {
     }
   }
 
-  if (EP > meteringAtual) {
+  String payload = "";
+
+  // Primeira leitura do dia: define base de medição = EP e consumo inicial = 0
+  if (!registroExiste) {
+    payload = "{\"energy_metering\":" + String(EP, 2) +
+              ",\"energy_consumption\":0.00}";
+  } else if (EP > meteringAtual) {
     float delta = EP - meteringAtual;
     float novoConsumo = consumoAtual + delta;
 
-    String payload = "{\"energy_metering\":" + String(EP, 2) +
-                     ",\"energy_consumption\":" + String(novoConsumo, 2) + "}";
+    payload = "{\"energy_metering\":" + String(EP, 2) +
+              ",\"energy_consumption\":" + String(novoConsumo, 2) + "}";
+  }
 
+  if (payload.length() > 0) {
     String putResposta;
     int putCode = firebaseReq("PUT", caminhoAtivo.c_str(), payload, putResposta);
+    yield();
 
     if (putCode <= 0 || putCode >= 400) {
       logErro("FIREBASE_PUT", putResposta, putCode);
