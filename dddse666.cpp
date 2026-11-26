@@ -15,7 +15,7 @@ static RegConfig regsDDSU[] = {
   {0x2002, "I", &I},
   {0x2004, "PKW", &PKW},
   {0x200A, "PF", &PF},
-  {0x2006, "EP", &EP},
+  {0x4000, "EP", &EP},
   {0x400A, "RE", &RE}
 };
 
